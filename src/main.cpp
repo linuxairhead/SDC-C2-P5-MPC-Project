@@ -90,7 +90,32 @@ int main() {
           double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
-          double v = j[1]["speed"];
+          double v = j[1]["speed"] * 0.447; // convert from mph to m/s
+          double steering_angle = j[1]["steering_angle"];
+          double throttle = j[1]["throttle"];
+
+          // Convert to the vehicle coordinate system
+          Eigen::VectorXd x_veh(N), y_veh(N);
+          for(int i = 0; i < N; i++) {
+             x_veh[i] = (ptsx[i] - px) * cos(-psi) - (ptsy[i] - py) * sin(-psi);
+             y_veh[i] = (ptsy[i] - py) * cos(-psi) - (ptsx[i] - px) * sin(-psi);
+          }
+          auto coeffs = polyfit(x_veh, y_veh, 3);
+          double cte = coeffs[0];
+          double epsi = -atan(coeffs[1]);
+
+          // predict vehicle state using kinematic model
+          double px_pred = v * dt;
+          double py_pred = 0;
+          double psi_pred = -v * steering_angle * dt / Lf;
+          double v_pred = v + throttle * dt;
+          double cte_pred = cte + v * sin(epsi) * dt;
+          double epsi_pred = epsi + psi_pred;
+
+          // predict
+          Eigen::VectorXd state(6);
+          state << px_pred, py_pred, psi_pred, v_pred, cte_pred, epsi_pred;
+          vector<double> mpc_results = mpc.Solve(state, coeffs);
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,13 +123,13 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value = j[1]["steering_angle"];
-          double throttle_value = j[1]["throttle"];
+          double steer_value = mpc_results[0];
+          double throttle_value = mpc_results[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = steer_value/deg2rad(25);
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
