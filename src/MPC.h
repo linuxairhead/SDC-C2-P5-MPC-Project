@@ -6,6 +6,8 @@
 
 using namespace std;
 
+#define MPC_DEBUG(fn, log) std::cout << "MPC : " << fn << " : " << log << "\n";
+
 class MPC {
  public:
   MPC();

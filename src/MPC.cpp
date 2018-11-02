@@ -45,6 +45,7 @@ class FG_eval {
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
+    MPC_DEBUG("FG_eval : operator", "start"); 
     // TODO: implement MPC
     // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
     // NOTE: You'll probably go back and forth between this function and
@@ -128,10 +129,8 @@ class FG_eval {
       fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
       fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
       fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
-      fg[1 + cte_start + t] =
-          cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
-      fg[1 + epsi_start + t] =
-          epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
+      fg[1 + cte_start + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
+      fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
      }
   }
 };
@@ -270,8 +269,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {solution.x[x_start + 1],   solution.x[y_start + 1],
-          solution.x[psi_start + 1], solution.x[v_start + 1],
-          solution.x[cte_start + 1], solution.x[epsi_start + 1],
-          solution.x[delta_start],   solution.x[a_start]};
+  
+  vector<double> outputs;
+  MPC_DEBUG("solve : steering ", solution.x[delta_start]);
+  outputs.push_back(solution.x[delta_start]); //steering
+
+  MPC_DEBUG("solve : acceleration ", solution.x[a_start]);
+  outputs.push_back(solution.x[a_start]);     //acceleration
+
+  for ( i=1; i<N ; i++) {
+     MPC_DEBUG("solve : x start ", solution.x[x_start+i]);
+     outputs.push_back(solution.x[x_start+i]);
+
+     MPC_DEBUG("solve : y start ", solution.x[y_start+i]);
+     outputs.push_back(solution.x[y_start+i]);
+  }
+  return outputs;
 }
