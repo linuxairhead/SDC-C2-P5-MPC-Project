@@ -9,8 +9,15 @@ using namespace std;
 #define MPC_DEBUG(fn, log) std::cout << "MPC : " << fn << " : " << log << "\n";
 
 // TODO: Set the timestep length and duration
-const size_t N = 25;
-const double dt = 0.05;
+
+const size_t N = 25;     // Number of timesteps in the horizon
+                         // determines the number of variables optimized byt the MPC
+                         // major driver of computational cost
+
+const double dt = 0.05;  // the time elapses between actuation
+                         // MPC attempts to approximate a continuous reference trajectory 
+                         // by means of discrete path between actuation.
+                         // large dt means less frequent actuation, harder to accurately approximate a continuous reference trajectory:
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -26,7 +33,7 @@ const double Lf = 2.67;
 
 // Both the reference cross track and orientation errors are 0.
 // The reference velocity is set to 40 mph.
-double ref_v = 40;
+const double ref_v = 40;
 
 class MPC {
  public:

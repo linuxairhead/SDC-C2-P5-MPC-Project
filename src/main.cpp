@@ -9,6 +9,8 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
 
+#define MAIN_DEBUG(fn, log) std::cout << "MAIN : " << log << "\n";
+
 // for convenience
 using json = nlohmann::json;
 
@@ -69,6 +71,7 @@ int main() {
   uWS::Hub h;
 
   // MPC is initialized here!
+  MAIN_DEBUG("Main", "start");
   MPC mpc;
 
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -90,9 +93,12 @@ int main() {
           double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
-          double v = j[1]["speed"] * 0.447; // convert from mph to m/s
+          double v = j[1]["speed"];
+          v *= 0.447; // convert from mph to m/s
           double steering_angle = j[1]["steering_angle"];
           double throttle = j[1]["throttle"];
+
+          MAIN_DEBUG("Main", "set Json value");
 
           // Convert to the vehicle coordinate system
           Eigen::VectorXd x_veh(N), y_veh(N);
@@ -103,6 +109,7 @@ int main() {
           auto coeffs = polyfit(x_veh, y_veh, 3);
           double cte = coeffs[0];
           double epsi = -atan(coeffs[1]);
+          MAIN_DEBUG("Main", "conver to the vehicle coordinate system");
 
           // predict vehicle state using kinematic model
           double px_pred = v * dt;
@@ -111,11 +118,13 @@ int main() {
           double v_pred = v + throttle * dt;
           double cte_pred = cte + v * sin(epsi) * dt;
           double epsi_pred = epsi + psi_pred;
+          MAIN_DEBUG("Main", "predict kinematic model");
 
           // predict
           Eigen::VectorXd state(6);
           state << px_pred, py_pred, psi_pred, v_pred, cte_pred, epsi_pred;
           vector<double> mpc_results = mpc.Solve(state, coeffs);
+          MAIN_DEBUG("Main", "get mpc result");
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.

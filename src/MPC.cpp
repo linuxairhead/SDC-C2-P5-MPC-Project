@@ -9,13 +9,13 @@ using CppAD::AD;
 // variables in a singular vector. Thus, we should to establish
 // when one variable starts and another ends to make our lifes easier.
 size_t x_start = 0;
-size_t y_start = x_start + N;
-size_t psi_start = y_start + N;
-size_t v_start = psi_start + N;
-size_t cte_start = v_start + N;
-size_t epsi_start = cte_start + N;
-size_t delta_start = epsi_start + N;
-size_t a_start = delta_start + N - 1;
+size_t y_start = x_start + N;         //N
+size_t psi_start = y_start + N;       //2N
+size_t v_start = psi_start + N;       //3N
+size_t cte_start = v_start + N;       //4N 
+size_t epsi_start = cte_start + N;    //5N
+size_t delta_start = epsi_start + N;  //6N
+size_t a_start = delta_start + N - 1; //7N-1
 
 class FG_eval {
  public:
@@ -40,18 +40,21 @@ class FG_eval {
       fg[0] += CppAD::pow(vars[epsi_start + t], 2);
       fg[0] += CppAD::pow(vars[v_start + t], 2);
     }
+    MPC_DEBUG("FG_eval : operator", "the cost based on the reference state");
 
     // Minimize the use of actuators.
     for (int t = 0; t < N -1 ; t++) {
       fg[0] += CppAD::pow(vars[delta_start + t], 2);
       fg[0] += CppAD::pow(vars[a_start + t], 2);
     }
+    MPC_DEBUG("FG_eval : operator", "the cost based of the actuators");
 
     // Minimize the value gap between sequential actuations.
     for (int t = 0; t < N - 2; t++) {
       fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
       fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
+    MPC_DEBUG("FG_eval : operator", "the cost based on the sequential value");
 
     //
     // Setup Constraints
@@ -69,6 +72,8 @@ class FG_eval {
     fg[1 + v_start] = vars[v_start];
     fg[1 + cte_start] = vars[cte_start];
     fg[1 + epsi_start] = vars[epsi_start];
+
+    MPC_DEBUG("FG_eval : operator", "bumps up the position");
 
     // The rest of the constraints
     for (int t = 1; t < N; t++) {
@@ -112,6 +117,7 @@ class FG_eval {
       fg[1 + cte_start + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
       fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
      }
+     MPC_DEBUG("FG_eval : operator", "set the state value at t and t+1");
   }
 };
 
@@ -125,6 +131,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
+
+  MPC_DEBUG("MPC : Solve", "Start");
 
   double x = state[0];
   double y = state[1];
@@ -148,6 +156,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   for (int i = 0; i < n_vars; i++) {
     vars[i] = 0;
   }
+  MPC_DEBUG("MPC : Solve", "initialized variable with zero");
 
   // Set the initial variable values
   vars[x_start] = x;
@@ -156,6 +165,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   vars[v_start] = v;
   vars[cte_start] = cte;
   vars[epsi_start] = epsi;
+
+  MPC_DEBUG("MPC : Solve", "initialized variable with set value");
 
   // TODO: Set lower and upper limits for variables.
 
@@ -169,6 +180,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     vars_lowerbound[i] = -1.0e19;
     vars_upperbound[i] = 1.0e19;
   }
+   MPC_DEBUG("MPC : Solve", "initialized non actuators upper and lower limit variable");
 
   // The upper and lower limits of delta are set to -25 and 25
   // degrees (values in radians).
@@ -178,6 +190,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     vars_upperbound[i] = 0.436332;
   }
 
+  MPC_DEBUG("MPC : Solve", "initialized non actuators upper and lower limit variable 2");
+
   // Acceleration/decceleration upper and lower limits.
   // NOTE: Feel free to change this to something else.
   for (int i = a_start; i < n_vars; i++) {
@@ -185,15 +199,21 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     vars_upperbound[i] = 1.0;
   }
 
+  MPC_DEBUG("MPC : Solve", "initialized non actuators upper and lower limit variable 3");
+
   // Lower and upper limits for constraints
   // All of these should be 0 except the initial
   // state indices.
   Dvector constraints_lowerbound(n_constraints);
   Dvector constraints_upperbound(n_constraints);
+
   for (int i = 0; i < n_constraints; i++) {
     constraints_lowerbound[i] = 0;
     constraints_upperbound[i] = 0;
   }
+
+  MPC_DEBUG("MPC : Solve", "initialized non actuators upper and lower limit variable 4");
+
   constraints_lowerbound[x_start] = x;
   constraints_lowerbound[y_start] = y;
   constraints_lowerbound[psi_start] = psi;
@@ -210,14 +230,17 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
+  MPC_DEBUG("MPC : Solve", "fg_eval");
 
   //
   // NOTE: You don't have to worry about these options
   //
   // options for IPOPT solver
   std::string options;
+
   // Uncomment this if you'd like more print information
   options += "Integer print_level  0\n";
+
   // NOTE: Setting sparse to true allows the solver to take advantage
   // of sparse routines, this makes the computation MUCH FASTER. If you
   // can uncomment 1 of these and see if it makes a difference or not but
@@ -225,6 +248,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // magnitude.
   options += "Sparse  true        forward\n";
   options += "Sparse  true        reverse\n";
+
   // NOTE: Currently the solver has a maximum time limit of 0.5 seconds.
   // Change this as you see fit.
   options += "Numeric max_cpu_time          0.5\n";
@@ -236,6 +260,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   CppAD::ipopt::solve<Dvector, FG_eval>(
       options, vars, vars_lowerbound, vars_upperbound, constraints_lowerbound,
       constraints_upperbound, fg_eval, solution);
+  MPC_DEBUG("MPC : Solve", "done solve the problem");
 
   // Check some of the solution values
   ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
@@ -251,17 +276,18 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // creates a 2 element double vector.
 
   vector<double> outputs;
-  MPC_DEBUG("solve : steering ", solution.x[delta_start]);
+
+  //MPC_DEBUG("MPC : solve : steering ", solution.x[delta_start]);
   outputs.push_back(solution.x[delta_start]); //steering
 
-  MPC_DEBUG("solve : acceleration ", solution.x[a_start]);
+  //MPC_DEBUG("MPC : solve : acceleration ", solution.x[a_start]);
   outputs.push_back(solution.x[a_start]);     //acceleration
 
   for ( i=1; i<N ; i++) {
-     MPC_DEBUG("solve : x start ", solution.x[x_start+i]);
+     //MPC_DEBUG("MPC : solve : x start ", solution.x[x_start+i]);
      outputs.push_back(solution.x[x_start+i]);
 
-     MPC_DEBUG("solve : y start ", solution.x[y_start+i]);
+     //MPC_DEBUG("MPC : solve : y start ", solution.x[y_start+i]);
      outputs.push_back(solution.x[y_start+i]);
   }
   return outputs;
