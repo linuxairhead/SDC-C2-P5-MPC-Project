@@ -6,7 +6,11 @@
 
 using namespace std;
 
+#if DEBUG
 #define MPC_DEBUG(fn, log) std::cout << "MPC : " << fn << " : " << log << "\n";
+#else
+#define MPC_DEBUG(fn, log);
+#endif
 
 // TODO: Set the timestep length and duration
 

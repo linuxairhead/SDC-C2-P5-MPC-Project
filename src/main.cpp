@@ -9,7 +9,13 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
 
+#define DEBUG 0
+
+#if DEBUG
 #define MAIN_DEBUG(fn, log) std::cout << "MAIN : " << log << "\n";
+#else
+#define MAIN_DEBUG(fg, log);
+#endif
 
 // for convenience
 using json = nlohmann::json;
@@ -101,10 +107,10 @@ int main() {
           MAIN_DEBUG("Main", "set Json value");
 
           // Convert to the vehicle coordinate system
-          Eigen::VectorXd x_veh(N), y_veh(N);
-          for(size_t i = 0; i < N; i++) {
+          Eigen::VectorXd x_veh(ptsx.size()), y_veh(ptsx.size());
+          for(size_t i = 0; i < ptsx.size(); i++) {
              x_veh[i] = (ptsx[i] - px) * cos(-psi) - (ptsy[i] - py) * sin(-psi);
-             y_veh[i] = (ptsy[i] - py) * cos(-psi) - (ptsx[i] - px) * sin(-psi);
+             y_veh[i] = (ptsy[i] - py) * sin(-psi) + (ptsx[i] - px) * cos(-psi);
           }
           auto coeffs = polyfit(x_veh, y_veh, 3);
           double cte = coeffs[0];
@@ -132,13 +138,13 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value = mpc_results[0];
+          double steer_value = mpc_results[0]/deg2rad(25);
           double throttle_value = mpc_results[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = -steer_value/deg2rad(25);
+          msgJson["steering_angle"] = -steer_value;
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
