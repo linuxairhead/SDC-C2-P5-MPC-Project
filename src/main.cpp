@@ -100,36 +100,34 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
-          v *= 0.447; // convert from mph to m/s
           double steering_angle = j[1]["steering_angle"];
           double throttle = j[1]["throttle"];
 
-          MAIN_DEBUG("Main", "set Json value");
+	  double latencyS = latency / 1000;
+          // Predict the next state
+          double px_pred = px + (v * cos(psi) * latencyS);
+          double py_pred = py + (v * sin(psi) * latencyS);
+          double psi_pred = psi - ((v * steering_angle * latencyS)/Lf);
+          double v_pred = v + (throttle * latencyS);
 
+          MAIN_DEBUG("Main", "set Json value");
           // Convert to the vehicle coordinate system
           Eigen::VectorXd x_veh(ptsx.size()), y_veh(ptsx.size());
-          for(size_t i = 0; i < ptsx.size(); i++) {
-             x_veh[i] = (ptsx[i] - px) * cos(-psi) - (ptsy[i] - py) * sin(-psi);
-             y_veh[i] = (ptsy[i] - py) * sin(-psi) + (ptsx[i] - px) * cos(-psi);
+          x_veh.fill(0.0);
+          y_veh.fill(0.0);
+          for(unsigned int i = 0; i < ptsx.size(); i++) {
+             x_veh[i] = (ptsx[i] - px_pred) * cos(-psi_pred) - (ptsy[i] - py_pred) * sin(-psi_pred);
+             y_veh[i] = (ptsx[i] - px_pred) * sin(-psi_pred) + (ptsy[i] - py_pred) * cos(-psi_pred);
           }
           auto coeffs = polyfit(x_veh, y_veh, 3);
-          double cte = coeffs[0];
+          double cte = polyeval(coeffs, 0);
           double epsi = -atan(coeffs[1]);
+
           MAIN_DEBUG("Main", "conver to the vehicle coordinate system");
 
-          // predict vehicle state using kinematic model
-          double px_pred = v * dt;
-          double py_pred = 0;
-          double psi_pred = -v * steering_angle * dt / Lf;
-          double v_pred = v + throttle * dt;
-          double cte_pred = cte + v * sin(epsi) * dt;
-          double epsi_pred = epsi + psi_pred;
-          MAIN_DEBUG("Main", "predict kinematic model");
-
-          // predict
           Eigen::VectorXd state(6);
-          state << px_pred, py_pred, psi_pred, v_pred, cte_pred, epsi_pred;
-          vector<double> mpc_results = mpc.Solve(state, coeffs);
+          state << 0, 0, 0, v_pred, cte, epsi;
+
           MAIN_DEBUG("Main", "get mpc result");
 
           /*
@@ -138,22 +136,25 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value = mpc_results[0]/deg2rad(25);
+          vector<double> mpc_results = mpc.Solve(state, coeffs);
+          double steer_value = -1.0 * mpc_results[0]/deg2rad(25);
           double throttle_value = mpc_results[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = -steer_value;
+          msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
-          for(size_t i=2; i < mpc_results.size(); i=i+2) {
-             mpc_x_vals.push_back(mpc_results[i]);
-             mpc_y_vals.push_back(mpc_results[i+1]);
+          for(size_t i=2; i < mpc_results.size(); i++) {
+             if(i%2 == 0)
+                mpc_x_vals.push_back(mpc_results[i]);
+             else
+                mpc_y_vals.push_back(mpc_results[i]);
           }
             
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
@@ -187,7 +188,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(int(latency)));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {

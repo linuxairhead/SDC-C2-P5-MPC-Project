@@ -39,6 +39,9 @@ const double Lf = 2.67;
 // The reference velocity is set to 40 mph.
 const double ref_v = 40;
 
+// the latency is 100ms or 0.1sec
+const double latency = 100;
+
 class MPC {
  public:
   MPC();

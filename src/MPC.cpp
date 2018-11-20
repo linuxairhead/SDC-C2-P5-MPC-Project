@@ -290,12 +290,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //MPC_DEBUG("MPC : solve : acceleration ", solution.x[a_start]);
   outputs.push_back(solution.x[a_start]);     //acceleration
 
-  for ( i=1; i<N ; i++) {
+  for ( i = 0; i < N - 1 ; i++) {
      //MPC_DEBUG("MPC : solve : x start ", solution.x[x_start+i]);
-     outputs.push_back(solution.x[x_start+i]);
+     outputs.push_back(solution.x[x_start + i + 1 ]);
 
      //MPC_DEBUG("MPC : solve : y start ", solution.x[y_start+i]);
-     outputs.push_back(solution.x[y_start+i]);
+     outputs.push_back(solution.x[y_start + i + 1]);
   }
   return outputs;
 }
